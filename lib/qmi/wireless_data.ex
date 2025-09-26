@@ -45,4 +45,15 @@ defmodule QMI.WirelessData do
     Codec.WirelessData.modify_profile_settings(profile_index, settings)
     |> QMI.call(qmi)
   end
+
+  @doc """
+  Get current WDS settings for the given IP family (4 or 6).
+  Returns a map that may include `:ipv4_mtu` and/or `:ipv6_mtu`.
+  """
+  @spec get_current_settings(QMI.name(), Codec.WirelessData.ip_family()) ::
+          {:ok, Codec.WirelessData.current_settings()} | {:error, atom()}
+  def get_current_settings(qmi, ip_family \\ 4) do
+    Codec.WirelessData.get_current_settings(ip_family)
+    |> QMI.call(qmi)
+  end
 end
