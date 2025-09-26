@@ -532,6 +532,20 @@ defmodule QMI.Codec.WirelessData do
     |> do_parse_get_current_settings_tlvs(rest)
   end
 
+  # Generic MTU TLV seen on some modems (type 0x29). Treat as interface MTU and
+  # populate both families if not already set.
+  defp do_parse_get_current_settings_tlvs(
+         parsed,
+         <<0x29, 0x04::little-16, mtu::little-32, rest::binary>>
+       ) do
+    Logger.debug("QMI WDS GetCurrentSettings MTU (generic u32)=#{mtu}")
+
+    parsed
+    |> put_if_absent(:ipv4_mtu, mtu)
+    |> put_if_absent(:ipv6_mtu, mtu)
+    |> do_parse_get_current_settings_tlvs(rest)
+  end
+
   # Skip other TLVs
   defp do_parse_get_current_settings_tlvs(
          parsed,
@@ -541,6 +555,10 @@ defmodule QMI.Codec.WirelessData do
       "QMI WDS GetCurrentSettings unknown TLV type=0x#{Integer.to_string(type, 16)} len=#{len} value=#{Base.encode16(value, case: :lower)}"
     )
     do_parse_get_current_settings_tlvs(parsed, rest)
+  end
+
+  defp put_if_absent(map, key, value) do
+    if Map.has_key?(map, key), do: map, else: Map.put(map, key, value)
   end
 
   @typedoc """
