@@ -10,7 +10,6 @@ defmodule QMI.Codec.WirelessData do
   """
 
   import Bitwise
-  require Logger
 
   @event_report 0x0001
   @start_network_interface 0x0020
@@ -457,10 +456,6 @@ defmodule QMI.Codec.WirelessData do
     tlvs = req_mask <> ext_tlv <> family_tlv <> tlv_pdh
     size = byte_size(tlvs)
 
-    Logger.debug(
-      "QMI WDS GetCurrentSettings request ip_family=#{ip_family} tlvs=#{Base.encode16(tlvs, case: :lower)}"
-    )
-
     %{
       service_id: 0x01,
       payload: [<<@get_current_settings::little-16, size::little-16>>, tlvs],
@@ -473,9 +468,6 @@ defmodule QMI.Codec.WirelessData do
   def parse_get_current_settings_resp(
         <<@get_current_settings::little-16, size::little-16, tlvs::binary-size(size)>>
       ) do
-    Logger.debug(
-      "QMI WDS GetCurrentSettings response tlvs=#{Base.encode16(tlvs, case: :lower)}"
-    )
     {:ok, do_parse_get_current_settings_tlvs(%{}, tlvs)}
   end
 
@@ -493,7 +485,6 @@ defmodule QMI.Codec.WirelessData do
          parsed,
          <<0x25, 0x02::little-16, mtu::little-16, rest::binary>>
        ) do
-    Logger.debug("QMI WDS GetCurrentSettings IPv4 MTU (u16)=#{mtu}")
     parsed
     |> Map.put(:ipv4_mtu, mtu)
     |> do_parse_get_current_settings_tlvs(rest)
@@ -504,7 +495,6 @@ defmodule QMI.Codec.WirelessData do
          parsed,
          <<0x25, 0x04::little-16, mtu::little-32, rest::binary>>
        ) do
-    Logger.debug("QMI WDS GetCurrentSettings IPv4 MTU (u32)=#{mtu}")
     parsed
     |> Map.put(:ipv4_mtu, mtu)
     |> do_parse_get_current_settings_tlvs(rest)
@@ -515,7 +505,6 @@ defmodule QMI.Codec.WirelessData do
          parsed,
          <<0x24, 0x02::little-16, mtu::little-16, rest::binary>>
        ) do
-    Logger.debug("QMI WDS GetCurrentSettings IPv6 MTU (u16)=#{mtu}")
     parsed
     |> Map.put(:ipv6_mtu, mtu)
     |> do_parse_get_current_settings_tlvs(rest)
@@ -526,7 +515,6 @@ defmodule QMI.Codec.WirelessData do
          parsed,
          <<0x24, 0x04::little-16, mtu::little-32, rest::binary>>
        ) do
-    Logger.debug("QMI WDS GetCurrentSettings IPv6 MTU (u32)=#{mtu}")
     parsed
     |> Map.put(:ipv6_mtu, mtu)
     |> do_parse_get_current_settings_tlvs(rest)
@@ -538,7 +526,6 @@ defmodule QMI.Codec.WirelessData do
          parsed,
          <<0x29, 0x04::little-16, mtu::little-32, rest::binary>>
        ) do
-    Logger.debug("QMI WDS GetCurrentSettings MTU (generic u32)=#{mtu}")
 
     parsed
     |> put_if_absent(:ipv4_mtu, mtu)
@@ -551,9 +538,6 @@ defmodule QMI.Codec.WirelessData do
          parsed,
          <<type, len::little-16, value::binary-size(len), rest::binary>>
        ) do
-    Logger.debug(
-      "QMI WDS GetCurrentSettings unknown TLV type=0x#{Integer.to_string(type, 16)} len=#{len} value=#{Base.encode16(value, case: :lower)}"
-    )
     do_parse_get_current_settings_tlvs(parsed, rest)
   end
 
