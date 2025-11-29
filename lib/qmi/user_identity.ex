@@ -12,11 +12,11 @@ defmodule QMI.UserIdentity do
   @doc """
   Send a request to read a transparent file
   """
-  @spec read_transparent(QMI.name(), non_neg_integer(), non_neg_integer()) ::
+  @spec read_transparent(QMI.name(), non_neg_integer(), non_neg_integer(), keyword()) ::
           {:ok, Codec.UserIdentity.read_transparent_response()} | {:error, atom()}
-  def read_transparent(qmi, file_id, file_path) do
+  def read_transparent(qmi, file_id, file_path, opts \\ []) do
     Codec.UserIdentity.read_transparent(file_id, file_path)
-    |> QMI.call(qmi)
+    |> QMI.call(qmi, opts)
   end
 
   @doc """
