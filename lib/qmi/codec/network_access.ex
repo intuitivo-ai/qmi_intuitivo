@@ -586,6 +586,10 @@ defmodule QMI.Codec.NetworkAccess do
     parse_get_sys_info_tlvs(parsed, rest)
   end
 
+  defp parse_get_sys_info_tlvs(parsed, <<0x12, 0x03::little-16, _data::3-bytes, rest::binary>>) do
+    parse_get_sys_info_tlvs(parsed, rest)
+  end
+
   defp parse_get_sys_info_tlvs(parsed, <<0x13, 0x03::little-16, _data::3-bytes, rest::binary>>) do
     parse_get_sys_info_tlvs(parsed, rest)
   end
