@@ -188,7 +188,7 @@ defmodule QMI.Driver do
         GenServer.reply(from, result)
 
       nil ->
-        Logger.warning(
+        Logger.debug(
           "QMI: Ignoring response for unknown transaction: #{inspect(transaction_id)}"
         )
     end
