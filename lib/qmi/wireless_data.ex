@@ -55,10 +55,10 @@ defmodule QMI.WirelessData do
   * `:packet_data_handle` - include PDH (0x01) for the active session
   """
   @spec get_current_settings(QMI.name(), Codec.WirelessData.ip_family(),
-          [Codec.WirelessData.get_current_settings_opt()]) ::
+          [Codec.WirelessData.get_current_settings_opt()], keyword()) ::
           {:ok, Codec.WirelessData.current_settings()} | {:error, atom()}
-  def get_current_settings(qmi, ip_family \\ 4, opts \\ []) do
+  def get_current_settings(qmi, ip_family \\ 4, opts \\ [], call_opts \\ []) do
     Codec.WirelessData.get_current_settings(ip_family, opts)
-    |> QMI.call(qmi)
+    |> QMI.call(qmi, call_opts)
   end
 end
