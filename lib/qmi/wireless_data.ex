@@ -26,6 +26,17 @@ defmodule QMI.WirelessData do
   end
 
   @doc """
+  Stop the network interface
+  """
+  @spec stop_network_interface(QMI.name(), [
+          Codec.WirelessData.stop_network_interface_opt()
+        ]) :: :ok | {:error, atom()}
+  def stop_network_interface(qmi, opts \\ []) do
+    Codec.WirelessData.stop_network_interface(opts)
+    |> QMI.call(qmi)
+  end
+
+  @doc """
   Set the event report options for the wireless data event indication
   """
   @spec set_event_report(QMI.name(), [Codec.WirelessData.event_report_opt()]) ::

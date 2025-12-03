@@ -13,6 +13,7 @@ defmodule QMI.Codec.WirelessData do
 
   @event_report 0x0001
   @start_network_interface 0x0020
+  @stop_network_interface 0x0021
   @packet_service_status_ind 0x0022
   @modify_profile_settings 0x0028
   @get_current_settings 0x002D
@@ -35,6 +36,11 @@ defmodule QMI.Codec.WirelessData do
   Report from starting the network interface
   """
   @type start_network_report() :: %{packet_data_handle: non_neg_integer()}
+
+  @typedoc """
+  Options for stopping the network interface
+  """
+  @type stop_network_interface_opt() :: {:packet_data_handle, non_neg_integer()}
 
   @typedoc """
   The type of reasons the call ended
@@ -102,6 +108,26 @@ defmodule QMI.Codec.WirelessData do
     %{service_id: 0x01, payload: payload, decode: &parse_start_network_interface_resp/1}
   end
 
+  @doc """
+  Send command to stop the network interface
+  """
+  @spec stop_network_interface([stop_network_interface_opt()]) :: QMI.request()
+  def stop_network_interface(opts \\ []) do
+    {tlvs, size} = make_stop_network_interface_tlvs(opts, [], 0)
+    payload = [<<@stop_network_interface::little-16, size::little-16>>, tlvs]
+
+    %{service_id: 0x01, payload: payload, decode: &parse_stop_network_interface_resp/1}
+  end
+
+  defp make_stop_network_interface_tlvs([], tlvs, size) do
+    {tlvs, size}
+  end
+
+  defp make_stop_network_interface_tlvs([{:packet_data_handle, handle} | rest], tlvs, size) do
+    tlv = <<0x01, 0x04::little-16, handle::little-32>>
+    make_stop_network_interface_tlvs(rest, [tlvs, tlv], size + byte_size(tlv))
+  end
+
   defp make_tlvs([], tlvs, size) do
     {tlvs, size}
   end
@@ -125,6 +151,16 @@ defmodule QMI.Codec.WirelessData do
   end
 
   defp parse_start_network_interface_resp(_other) do
+    {:error, :unexpected_response}
+  end
+
+  defp parse_stop_network_interface_resp(
+         <<@stop_network_interface::little-16, _size::little-16, _tlvs::binary>>
+       ) do
+    :ok
+  end
+
+  defp parse_stop_network_interface_resp(_other) do
     {:error, :unexpected_response}
   end
 
