@@ -76,10 +76,10 @@ defmodule QMI do
 
   NOTE: the QMI name parameter is second to facilitate piping
   """
-  @spec call(request(), name()) :: any()
-  def call(request, qmi) do
+  @spec call(request(), name(), keyword()) :: any()
+  def call(request, qmi, opts \\ []) do
     with {:ok, client_id} <- QMI.ClientIDCache.get_client_id(qmi, request.service_id) do
-      QMI.Driver.call(qmi, client_id, request)
+      QMI.Driver.call(qmi, client_id, request, opts)
     end
   end
 end

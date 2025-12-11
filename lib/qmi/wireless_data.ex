@@ -26,6 +26,17 @@ defmodule QMI.WirelessData do
   end
 
   @doc """
+  Stop the network interface
+  """
+  @spec stop_network_interface(QMI.name(), [
+          Codec.WirelessData.stop_network_interface_opt()
+        ]) :: :ok | {:error, atom()}
+  def stop_network_interface(qmi, opts \\ []) do
+    Codec.WirelessData.stop_network_interface(opts)
+    |> QMI.call(qmi)
+  end
+
+  @doc """
   Set the event report options for the wireless data event indication
   """
   @spec set_event_report(QMI.name(), [Codec.WirelessData.event_report_opt()]) ::
@@ -55,10 +66,10 @@ defmodule QMI.WirelessData do
   * `:packet_data_handle` - include PDH (0x01) for the active session
   """
   @spec get_current_settings(QMI.name(), Codec.WirelessData.ip_family(),
-          [Codec.WirelessData.get_current_settings_opt()]) ::
+          [Codec.WirelessData.get_current_settings_opt()], keyword()) ::
           {:ok, Codec.WirelessData.current_settings()} | {:error, atom()}
-  def get_current_settings(qmi, ip_family \\ 4, opts \\ []) do
+  def get_current_settings(qmi, ip_family \\ 4, opts \\ [], call_opts \\ []) do
     Codec.WirelessData.get_current_settings(ip_family, opts)
-    |> QMI.call(qmi)
+    |> QMI.call(qmi, call_opts)
   end
 end

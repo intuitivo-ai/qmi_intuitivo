@@ -188,7 +188,7 @@ defmodule QMI.Driver do
         GenServer.reply(from, result)
 
       nil ->
-        Logger.warning(
+        Logger.debug(
           "QMI: Ignoring response for unknown transaction: #{inspect(transaction_id)}"
         )
     end
@@ -201,9 +201,14 @@ defmodule QMI.Driver do
   end
 
   defp fail_transaction_id(state, transaction_id, error) do
-    {{from, _request, timer}, transactions} = Map.pop(state.transactions, transaction_id)
-    _ = Process.cancel_timer(timer)
-    GenServer.reply(from, {:error, error})
-    %{state | transactions: transactions}
+    case Map.pop(state.transactions, transaction_id) do
+      {{from, _request, timer}, transactions} ->
+        _ = Process.cancel_timer(timer)
+        GenServer.reply(from, {:error, error})
+        %{state | transactions: transactions}
+
+      {nil, _transactions} ->
+        state
+    end
   end
 end
