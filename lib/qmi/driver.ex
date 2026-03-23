@@ -216,7 +216,10 @@ defmodule QMI.Driver do
   end
 
   defp handle_report(%{transaction_id: transaction_id, code: :failure, error: error}, state) do
-    {:noreply, fail_transaction_id(state, transaction_id, error)}
+    # A failure response is still a valid response from the device (it communicated),
+    # so reset consecutive_timeouts just like :success does.
+    new_state = fail_transaction_id(state, transaction_id, error)
+    {:noreply, %{new_state | consecutive_timeouts: 0}}
   end
 
   defp fail_all_transactions(state, reason) do
