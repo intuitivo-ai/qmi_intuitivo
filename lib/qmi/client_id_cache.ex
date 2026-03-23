@@ -19,6 +19,17 @@ defmodule QMI.ClientIDCache do
     GenServer.call(name(qmi), {:get_client_id, qmi, service_id})
   end
 
+  @doc """
+  Invalidate all cached client IDs.
+
+  Called when the underlying device is closed/reopened, since old client IDs
+  are no longer valid after a device reset.
+  """
+  @spec clear(module()) :: :ok
+  def clear(qmi) do
+    GenServer.cast(name(qmi), :clear)
+  end
+
   defp name(qmi) do
     Module.concat(qmi, ClientIDCache)
   end
@@ -26,6 +37,11 @@ defmodule QMI.ClientIDCache do
   @impl GenServer
   def init(_init_args) do
     {:ok, %{}}
+  end
+
+  @impl GenServer
+  def handle_cast(:clear, _state) do
+    {:noreply, %{}}
   end
 
   @impl GenServer
