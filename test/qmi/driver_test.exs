@@ -155,6 +155,78 @@ defmodule QMI.DriverTest do
            "A failure response proves device is alive; consecutive_timeouts should reset to 0"
   end
 
+  test "stale timeout does NOT increment consecutive_timeouts", %{driver_pid: pid} do
+    # Process.cancel_timer doesn't flush messages already in the mailbox.
+    # A stale {:timeout, id} can arrive after the transaction was already completed
+    # (success, failure, or fail_all_transactions on :closed). Without the guard,
+    # a stale timeout would increment consecutive_timeouts even for a healthy session.
+    :sys.replace_state(pid, fn s -> %{s | consecutive_timeouts: 0} end)
+
+    # Send a timeout for a transaction_id that does NOT exist in state.transactions
+    send(pid, {:timeout, 99999})
+    Process.sleep(50)
+
+    assert :sys.get_state(pid).consecutive_timeouts == 0,
+           "Stale timeout (unknown transaction_id) must not increment consecutive_timeouts"
+  end
+
+  test "stale timeout after :closed does NOT trigger false unresponsive warning", %{driver_pid: pid} do
+    # Sequence: timeout timer fires → :closed resets consecutive_timeouts to 0 →
+    # stale {:timeout, id} arrives → must NOT increment past 0 on the new session.
+    state = :sys.get_state(pid)
+    ref = state.ref
+
+    # Inject a pending transaction with a very short timeout
+    timer = Process.send_after(self(), :never, 60_000)
+    tag = make_ref()
+    fake_from = {self(), tag}
+    :sys.replace_state(pid, fn s ->
+      %{s | transactions: Map.put(s.transactions, 777, {fake_from, %{decode: fn _ -> :ok end}, timer})}
+    end)
+
+    # Set consecutive_timeouts high so a false increment would cross the threshold
+    :sys.replace_state(pid, fn s -> %{s | consecutive_timeouts: 2} end)
+
+    # Device closes → resets consecutive_timeouts to 0 and clears transactions
+    send(pid, {:dev_bridge, ref, :closed})
+    Process.sleep(200)
+
+    assert :sys.get_state(pid).consecutive_timeouts == 0
+
+    # Now send a stale timeout for transaction 777 (already cleared by :closed)
+    send(pid, {:timeout, 777})
+    Process.sleep(50)
+
+    assert :sys.get_state(pid).consecutive_timeouts == 0,
+           "Stale timeout from old session must not increment consecutive_timeouts on new session"
+  end
+
+  test "valid timeout DOES increment consecutive_timeouts", %{driver_pid: pid} do
+    # Confirm the counter still increments for real timeouts (live transactions).
+    timer = Process.send_after(self(), :never, 60_000)
+    tag = make_ref()
+    fake_from = {self(), tag}
+
+    :sys.replace_state(pid, fn s ->
+      %{s |
+        transactions: Map.put(s.transactions, 555, {fake_from, %{decode: fn _ -> :ok end}, timer}),
+        consecutive_timeouts: 0
+      }
+    end)
+
+    assert Map.has_key?(:sys.get_state(pid).transactions, 555)
+
+    send(pid, {:timeout, 555})
+    Process.sleep(50)
+
+    assert :sys.get_state(pid).consecutive_timeouts == 1,
+           "A timeout for a live transaction must increment consecutive_timeouts"
+
+    # The transaction should also be removed and caller gets :timeout error
+    assert :sys.get_state(pid).transactions == %{}
+    assert_received {^tag, {:error, :timeout}}
+  end
+
   # Mirrors handle_report(:failure) logic
   defp simulate_failure_response(state) do
     %{state | consecutive_timeouts: 0}

@@ -87,17 +87,26 @@ defmodule QMI.Driver do
 
   @impl GenServer
   def handle_info({:timeout, transaction_id}, state) do
-    state = fail_transaction_id(state, transaction_id, :timeout)
-    consecutive = state.consecutive_timeouts + 1
-    state = %{state | consecutive_timeouts: consecutive}
+    # Only count the timeout if the transaction is still live.
+    # Process.cancel_timer doesn't flush messages already in the mailbox, so stale
+    # timeout messages can arrive after a success response, fail_all_transactions,
+    # or a :closed event resets consecutive_timeouts to 0. Incrementing on stale
+    # messages would false-alarm "device may be unresponsive" for healthy sessions.
+    if Map.has_key?(state.transactions, transaction_id) do
+      state = fail_transaction_id(state, transaction_id, :timeout)
+      consecutive = state.consecutive_timeouts + 1
+      state = %{state | consecutive_timeouts: consecutive}
 
-    if consecutive >= @consecutive_timeout_threshold do
-      Logger.warning(
-        "[QMI.Driver] #{state.device_path} - #{consecutive} consecutive timeouts, device may be unresponsive"
-      )
+      if consecutive >= @consecutive_timeout_threshold do
+        Logger.warning(
+          "[QMI.Driver] #{state.device_path} - #{consecutive} consecutive timeouts, device may be unresponsive"
+        )
+      end
+
+      {:noreply, state}
+    else
+      {:noreply, state}
     end
-
-    {:noreply, state}
   end
 
   def handle_info({:dev_bridge, ref, :read, data}, %{ref: ref} = state) do
