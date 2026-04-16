@@ -14,15 +14,19 @@ defmodule QMI.Driver do
 
   require Logger
 
+  @consecutive_timeout_threshold 3
+
   defmodule State do
     @moduledoc false
 
     defstruct bridge: nil,
               device_path: nil,
               ref: nil,
+              qmi_name: nil,
               transactions: %{},
               last_ctl_transaction: 0,
               last_service_transaction: 256,
+              consecutive_timeouts: 0,
               indication_callback: nil
   end
 
@@ -58,10 +62,11 @@ defmodule QMI.Driver do
 
   @impl GenServer
   def init(opts) do
+    qmi_name = Keyword.fetch!(opts, :name)
     state = struct(State, opts)
     {:ok, bridge} = DevBridge.start_link([])
 
-    {:ok, %{state | bridge: bridge}, {:continue, :open}}
+    {:ok, %{state | bridge: bridge, qmi_name: qmi_name}, {:continue, :open}}
   end
 
   @impl GenServer
@@ -82,7 +87,26 @@ defmodule QMI.Driver do
 
   @impl GenServer
   def handle_info({:timeout, transaction_id}, state) do
-    {:noreply, fail_transaction_id(state, transaction_id, :timeout)}
+    # Only count the timeout if the transaction is still live.
+    # Process.cancel_timer doesn't flush messages already in the mailbox, so stale
+    # timeout messages can arrive after a success response, fail_all_transactions,
+    # or a :closed event resets consecutive_timeouts to 0. Incrementing on stale
+    # messages would false-alarm "device may be unresponsive" for healthy sessions.
+    if Map.has_key?(state.transactions, transaction_id) do
+      state = fail_transaction_id(state, transaction_id, :timeout)
+      consecutive = state.consecutive_timeouts + 1
+      state = %{state | consecutive_timeouts: consecutive}
+
+      if consecutive >= @consecutive_timeout_threshold do
+        Logger.warning(
+          "[QMI.Driver] #{state.device_path} - #{consecutive} consecutive timeouts, device may be unresponsive"
+        )
+      end
+
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
   end
 
   def handle_info({:dev_bridge, ref, :read, data}, %{ref: ref} = state) do
@@ -101,11 +125,15 @@ defmodule QMI.Driver do
 
   def handle_info({:dev_bridge, ref, :error, err}, %{ref: ref} = state) do
     Logger.error("[QMI.Driver] #{state.device_path} - Error: #{inspect(err)}")
+    state = fail_all_transactions(state, {:device_error, err})
     {:noreply, state}
   end
 
   def handle_info({:dev_bridge, ref, :closed}, %{ref: ref} = state) do
-    {:noreply, state, {:continue, :open}}
+    Logger.warning("[QMI.Driver] #{state.device_path} - Device closed, failing pending transactions and reopening")
+    state = fail_all_transactions(state, :device_closed)
+    QMI.ClientIDCache.clear(state.qmi_name)
+    {:noreply, %{state | ref: nil, consecutive_timeouts: 0}, {:continue, :open}}
   end
 
   defp do_request(request, client_id, state) do
@@ -193,11 +221,20 @@ defmodule QMI.Driver do
         )
     end
 
-    {:noreply, %{state | transactions: transactions}}
+    {:noreply, %{state | transactions: transactions, consecutive_timeouts: 0}}
   end
 
   defp handle_report(%{transaction_id: transaction_id, code: :failure, error: error}, state) do
-    {:noreply, fail_transaction_id(state, transaction_id, error)}
+    # A failure response is still a valid response from the device (it communicated),
+    # so reset consecutive_timeouts just like :success does.
+    new_state = fail_transaction_id(state, transaction_id, error)
+    {:noreply, %{new_state | consecutive_timeouts: 0}}
+  end
+
+  defp fail_all_transactions(state, reason) do
+    Enum.reduce(state.transactions, state, fn {tid, _}, acc ->
+      fail_transaction_id(acc, tid, reason)
+    end)
   end
 
   defp fail_transaction_id(state, transaction_id, error) do
