@@ -738,9 +738,9 @@ defmodule QMI.Codec.NetworkAccess do
          parsed,
          <<type, length::little-16, data::binary-size(length), rest::binary>>
        ) do
-    Logger.debug(
-      "[QMI]: Ignoring TLV from operator get_sys_info #{type} #{length} #{inspect(data)}"
-    )
+    # Logger.debug(
+    #   "[QMI]: Ignoring TLV from operator get_sys_info #{type} #{length} #{inspect(data)}"
+    # )
 
     parse_get_sys_info_tlvs(parsed, rest)
   end
@@ -1286,7 +1286,7 @@ defmodule QMI.Codec.NetworkAccess do
          indication,
          <<type, size, values::binary-size(size), rest::binary>>
        ) do
-    Logger.debug("[QMI]: Ignoring TLV from operator name indication #{type} #{size} #{values}")
+    # Logger.debug("[QMI]: Ignoring TLV from operator name indication #{type} #{size} #{values}")
 
     parse_operator_name(indication, rest)
   end
